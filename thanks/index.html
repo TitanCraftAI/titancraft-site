@@ -1,0 +1,13 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Thanks · TitanCraft AI</title>
+<body style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:840px;margin:40px auto;padding:0 16px;line-height:1.6">
+  <h1>You're in 🎉</h1>
+  <p id="plan">Thanks for subscribing.</p>
+  <p>Next steps: you'll receive a Stripe email receipt. You can manage or cancel any time in the portal below.</p>
+  <p><a href="https://billing.stripe.com/p/login">Open Customer Portal</a> · <a href="/">Back to home</a></p>
+<script>
+  const p = new URLSearchParams(location.search).get("plan");
+  const map = {starter:"Starter ($19/mo)", pro:"Pro ($49/mo)", enterprise:"Enterprise ($99+/mo)"};
+  if (p) document.getElementById("plan").textContent = `Plan: ${map[p]||p}`;
+</script>
+</body>
