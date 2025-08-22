@@ -2,19 +2,96 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Pricing — TitanCraft AI</title>
-  <link href="https://cdn.jsdelivr.net/npm/modern-normalize/modern-normalize.css" rel="stylesheet">
-  <style>body{font-family: system-ui, Segoe UI, Arial, sans-serif; margin:0; color:#333}.header{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;border-bottom:1px solid #eee}.nav a{margin-left:16px;text-decoration:none;color:#333}.container{max-width:900px;margin:48px auto;padding:0 24px}.card{border:1px solid #eee;border-radius:12px;padding:20px;margin-bottom:16px}.btn{display:inline-block;background:#1f8cff;color:#fff;padding:10px 14px;border-radius:8px;text-decoration:none}footer{margin-top:64px;padding:24px;border-top:1px solid #eee;text-align:center}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pricing – TitanCraft</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg:#0b0b12; --card:#11111a; --muted:#a9acc1; --text:#fff; --accent:#6ee7b7; --border:#1b1b26; }
+    * { box-sizing:border-box }
+    html,body { margin:0; padding:0; background:var(--bg); color:var(--text); font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; }
+    a { color:inherit; text-decoration:none }
+    nav { max-width:960px; margin:28px auto 0; padding:0 20px; display:flex; gap:24px; align-items:center; }
+    nav a { color:var(--muted); }
+    nav a:hover { color:var(--text); }
+    .wrap { max-width:960px; margin:32px auto 80px; padding:0 20px; }
+    h1 { font-size:40px; margin:24px 0 12px; }
+    p.lede { color:var(--muted); margin:0 0 28px; }
+    .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:22px; display:flex; flex-direction:column; }
+    .badge { font-size:12px; color:#c8cbe0; background:#1b1b26; padding:6px 10px; border:1px solid #242436; border-radius:999px; align-self:flex-start; }
+    .price { font-size:36px; font-weight:700; margin:12px 0 6px; }
+    .per { color:var(--muted); font-size:14px; }
+    ul { list-style:none; padding:0; margin:16px 0 24px; color:#cfd2e8; }
+    li { margin:8px 0; }
+    .btn { display:inline-block; text-align:center; padding:12px 14px; border-radius:10px; border:1px solid #2a2a3c; background:#181826; color:#e6e8f6; font-weight:600; }
+    .btn:hover { background:#1d1d2c; }
+    .btn.primary { background:var(--accent); color:#0b0b12; border-color:transparent; }
+    .btn.primary:hover { filter:brightness(0.95); }
+    .split { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .note { color:var(--muted); font-size:13px; margin-top:8px; }
+    .enterprise { display:flex; flex-direction:column; justify-content:space-between; }
+    @media (max-width:900px){ .grid{ grid-template-columns:1fr; } }
+  </style>
 </head>
 <body>
-  <header class="header"><strong>TitanCraft AI</strong><nav class="nav"><a href="/">Home</a><a href="/pricing">Pricing</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/manage" class="btn">Manage Billing</a></nav></header>
-  <main class="container">
+  <nav>
+    <a href="/">Home</a>
+    <a href="/pricing/">Pricing</a>
+    <a href="/terms/">Terms</a>
+    <a href="/privacy/">Privacy</a>
+  </nav>
+
+  <div class="wrap">
     <h1>Pricing</h1>
-    <div class="card"><h3>Starter — $19/mo</h3><p>Great for getting started.</p><p><a class="btn" href="https://buy.stripe.com/7sY00j1ZC5Qx3b50zuaAw07">Subscribe</a></p></div>
-    <div class="card"><h3>Pro — $49/mo</h3><p>For growing teams.</p><p><a class="btn" href="https://buy.stripe.com/00w7sL6fS7YFh1VeqkaAw09">Subscribe</a></p></div>
-    <div class="card"><h3>Enterprise — Custom</h3><p>We'll tailor a plan to your scale.</p><p><a class="btn" href="https://buy.stripe.com/fZu3cv6fS0wd12X960aAw0b">Contact Sales</a></p></div>
-  </main>
-  <footer><p>Already a customer? <a class="btn" href="/manage">Manage Billing</a></p><p><a href="/terms">Terms</a> • <a href="/privacy">Privacy</a></p></footer>
+    <p class="lede">Start simple. Upgrade when you need more throughput and advanced routing. Cancel anytime.</p>
+
+    <div class="grid">
+      <!-- Starter -->
+      <div class="card">
+        <span class="badge">Starter</span>
+        <div class="price">$19<span class="per">/mo</span></div>
+        <ul>
+          <li>Up to 10k routed requests / mo</li>
+          <li>Stripe‑secure billing</li>
+          <li>Email support</li>
+        </ul>
+        <div class="split">
+          <a class="btn primary" href="https://buy.stripe.com/7sY00j1ZC5Qx3b50zuaAw07">Subscribe monthly</a>
+          <a class="btn" href="https://buy.stripe.com/6oUaEX47KbaR12Xbe8aAw08">Pay yearly ($199)</a>
+        </div>
+        <div class="note">Best for solo builders and early projects.</div>
+      </div>
+
+      <!-- Pro -->
+      <div class="card">
+        <span class="badge">Pro</span>
+        <div class="price">$49<span class="per">/mo</span></div>
+        <ul>
+          <li>Up to 100k routed requests / mo</li>
+          <li>Advanced routing rules</li>
+          <li>Priority email support</li>
+        </ul>
+        <a class="btn primary" href="https://buy.stripe.com/00w7sL6fS7YFh1VeqkaAw09">Subscribe Pro</a>
+        <div class="note">For teams and production workloads.</div>
+      </div>
+
+      <!-- Enterprise -->
+      <div class="card enterprise">
+        <div>
+          <span class="badge">Enterprise</span>
+          <div class="price">$99<span class="per">/mo+</span></div>
+          <ul>
+            <li>Custom limits and SLAs</li>
+            <li>Dedicated support</li>
+            <li>Security reviews & procurement</li>
+          </ul>
+        </div>
+        <a class="btn" href="https://buy.stripe.com/fZu3cv6fS0wd12X960aAw0b">Contact sales</a>
+        <div class="note">We’ll tailor a plan to your org’s needs.</div>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
