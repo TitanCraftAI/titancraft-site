@@ -30,14 +30,16 @@ jobs:
 
       - name: Create Search campaign
         env:
-          GADS_DEVELOPER_TOKEN: ${{ secrets.GADS_DEVELOPER_TOKEN }}
-          GADS_CLIENT_ID: ${{ secrets.GADS_CLIENT_ID }}
-          GADS_CLIENT_SECRET: ${{ secrets.GADS_CLIENT_SECRET }}
-          GADS_REFRESH_TOKEN: ${{ secrets.GADS_REFRESH_TOKEN }}
-          GADS_LOGIN_CUSTOMER_ID: ${{ secrets.GADS_LOGIN_CUSTOMER_ID }}
-          GADS_CUSTOMER_ID: ${{ secrets.GADS_CUSTOMER_ID }}
-          DAILY_BUDGET: ${{ github.event.inputs.daily_budget }}
-          CAMPAIGN_NAME: ${{ github.event.inputs.campaign_name }}
+env:
+  GADS_DEVELOPER_TOKEN:    ${{ secrets.GADS_DEVELOPER_TOKEN || secrets.GOOGLE_ADS_DEVELOPER_TOKEN }}
+  GADS_CLIENT_ID:          ${{ secrets.GADS_CLIENT_ID         || secrets.GOOGLE_ADS_CLIENT_ID }}
+  GADS_CLIENT_SECRET:      ${{ secrets.GADS_CLIENT_SECRET     || secrets.GOOGLE_ADS_CLIENT_SECRET }}
+  GADS_REFRESH_TOKEN:      ${{ secrets.GADS_REFRESH_TOKEN     || secrets.GOOGLE_ADS_REFRESH_TOKEN }}
+  GADS_LOGIN_CUSTOMER_ID:  ${{ secrets.GADS_LOGIN_CUSTOMER_ID || secrets.GOOGLE_ADS_LOGIN_CUSTOMER_ID }}
+  GADS_CUSTOMER_ID:        ${{ secrets.GADS_CUSTOMER_ID       || secrets.GOOGLE_ADS_CUSTOMER_ID }}
+  DAILY_BUDGET:            ${{ github.event.inputs.daily_budget }}
+  CAMPAIGN_NAME:           ${{ github.event.inputs.campaign_name }}
+
         run: |
           python - <<'PY'
           import os, uuid, sys
