@@ -1,0 +1,13 @@
+name: Marketing — Share Links
+on: { workflow_dispatch: {} }
+jobs:
+  links:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate UTM links
+        run: |
+          BASE="https://titancraft.io/founding-beta/"
+          for SRC in twitter linkedin reddit hackernews email; do
+            echo "$SRC: ${BASE}?utm_source=$SRC&utm_medium=social&utm_campaign=founding_beta"
+          done
+          echo "Checkout: https://buy.stripe.com/8x2fZh0Vy0wd8vp1DyaAw0c?utm_source=site&utm_medium=checkout&utm_campaign=founding_beta"
