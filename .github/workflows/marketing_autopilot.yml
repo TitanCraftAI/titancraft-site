@@ -1,73 +1,54 @@
 name: Marketing — Autopilot SEO + Indexing
+
 on:
-  schedule:
-    - cron: '17 7,19 * * *'   # twice daily UTC
   workflow_dispatch: {}
+  schedule:
+    - cron: '5 8 * * *'   # daily @ 08:05 UTC
+
+permissions:
+  contents: write
+
 jobs:
   autopilot:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with: { persist-credentials: true }
-      - uses: actions/setup-python@v5
-        with: { python-version: '3.11' }
+        with:
+          fetch-depth: 0
 
       - name: Generate sitemap & robots
         run: |
           python - <<'PY'
-          import os, subprocess, xml.etree.ElementTree as ET, datetime
-          domain = "https://titancraft.io"
-          pages = []
-          for root, _, files in os.walk("."):
-              if ".git" in root or ".github" in root: 
-                  continue
-              for f in files:
-                  if f.endswith(".html"):
-                      path = os.path.join(root, f)[2:]
-                      url = f"{domain}/{path}".replace("/index.html","/")
-                      try:
-                          dt = subprocess.check_output(
-                            ["git","log","-1","--format=%cI", path]
-                          ).decode().strip()
-                      except Exception:
-                          dt = datetime.datetime.utcnow().isoformat()+"Z"
-                      pages.append((url, dt))
-          urlset = ET.Element("urlset", xmlns="http://www.sitemaps.org/schemas/sitemap/0.9")
-          for url, dt in sorted(set(pages)):
-              u = ET.SubElement(urlset,"url")
-              ET.SubElement(u,"loc").text = url
-              ET.SubElement(u,"lastmod").text = dt
-              ET.SubElement(u,"changefreq").text = "daily"
-              ET.SubElement(u,"priority").text = "0.7" if "founding-beta" in url else "0.5"
-          ET.ElementTree(urlset).write("sitemap.xml", encoding="utf-8", xml_declaration=True)
-
-          # robots.txt (idempotent)
-          robots = "robots.txt"
-          wanted = f"Sitemap: {domain}/sitemap.xml"
-          lines = []
-          if os.path.exists(robots):
-              lines = open(robots, "r", encoding="utf-8").read().splitlines()
-          if wanted not in lines:
-              base = ["User-agent: *", "Allow: /"]
-              for b in base:
-                  if b not in lines: lines.append(b)
-              lines.append(wanted)
-              open(robots, "w", encoding="utf-8").write("\n".join(lines) + "\n")
+          import glob, os
+          from urllib.parse import urljoin
+          base = "https://titancraft.io/"
+          htmls = [p for p in glob.glob("**/*.html", recursive=True)
+                   if not p.startswith((".github/", "node_modules/"))]
+          urls = [urljoin(base, p.replace("index.html","")) for p in htmls]
+          urls = sorted(set([base] + urls))
+          sm = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+          sm += "".join(f"<url><loc>{u}</loc></url>\n" for u in urls)
+          sm += "</urlset>\n"
+          open("sitemap.xml","w").write(sm)
+          open("robots.txt","w").write("User-agent: *\nAllow: /\nSitemap: "+base+"sitemap.xml\n")
           PY
 
-      - name: Commit & push SEO assets
+      - name: Commit & push SEO assets (safe)
         run: |
-          if [ -n "$(git status --porcelain)" ]; then
-            git config user.name "titan-bot"
-            git config user.email "titan-bot@users.noreply.github.com"
-            git add sitemap.xml robots.txt
-            git commit -m "chore(seo): auto-generate sitemap & robots"
-            git push
-          else
-            echo "No changes to commit"
+          set -euxo pipefail
+          git config user.name "titan-bot"
+          git config user.email "titan-bot@users.noreply.github.com"
+          git add sitemap.xml robots.txt
+          if git diff --cached --quiet; then
+            echo "No SEO changes; skipping push."
+            exit 0
           fi
+          branch="${GITHUB_REF_NAME:-$(git rev-parse --abbrev-ref HEAD)}"
+          git pull --rebase origin "$branch" || true
+          git commit -m "chore(seo): auto-generate sitemap & robots"
+          git push origin "HEAD:$branch"
 
-      - name: Ping search engines
+      - name: Ping Google & Bing
         run: |
           curl -fsS "https://www.google.com/ping?sitemap=https://titancraft.io/sitemap.xml" || true
           curl -fsS "https://www.bing.com/ping?sitemap=https://titancraft.io/sitemap.xml" || true
