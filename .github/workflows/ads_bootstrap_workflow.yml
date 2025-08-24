@@ -1,8 +1,9 @@
 name: Marketing — Structured Meta (JSON-LD + OG/Twitter)
 
 on:
-  # manual only (avoids re-run loops on the commit this workflow makes)
-  workflow_dispatch: {}
+  workflow_dispatch:
+  schedule:
+    - cron: '17 9 * * 1,3,5'   # Mon/Wed/Fri 09:17 UTC
 
 permissions:
   contents: write
@@ -11,60 +12,60 @@ jobs:
   meta:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
       - name: Generate JSON-LD + OG/Twitter
+        shell: bash
         run: |
+          set -euxo pipefail
           python - <<'PY'
           import json, pathlib
-          site = "https://titancraft.io"
 
-          p = pathlib.Path("public")
-          p.mkdir(exist_ok=True)
+          SITE = "https://titancraft.io"
+          PUB = pathlib.Path("public")
+          PUB.mkdir(exist_ok=True)
 
-          # JSON-LD (Organization)
           org = {
               "@context": "https://schema.org",
               "@type": "Organization",
               "name": "TitanCraft AI",
-              "url": site,
-              "logo": f"{site}/public/logo.png",
+              "url": SITE,
+              "logo": f"{SITE}/public/logo.png",
               "sameAs": [
                   "https://x.com/titancraftai",
                   "https://www.linkedin.com/company/titancraft-ai",
               ],
           }
-          (p / "site.schema.json").write_text(json.dumps(org, indent=2))
+          (PUB / "site.schema.json").write_text(json.dumps(org, indent=2))
 
-          # Open Graph + Twitter meta fragment
-          og = f"""<meta property="og:title" content="TitanCraft AI">
+          meta = f"""<meta property="og:title" content="TitanCraft AI">
           <meta property="og:description" content="Beat ChatGPT by routing your questions to specialist models.">
           <meta property="og:type" content="website">
-          <meta property="og:url" content="{site}">
-          <meta property="og:image" content="{site}/public/og.png">
+          <meta property="og:url" content="{SITE}">
+          <meta property="og:image" content="{SITE}/public/og.png">
           <meta name="twitter:card" content="summary_large_image">
           <meta name="twitter:site" content="@titancraftai">"""
-          (p / "structured_meta.html").write_text(og)
+          (PUB / "structured_meta.html").write_text(meta)
           PY
 
-      - name: Commit & push meta (safe)
+      - name: Commit & push
         run: |
           set -euxo pipefail
           git config user.name  "titan-bot"
           git config user.email "titan-bot@users.noreply.github.com"
-
           git add public/site.schema.json public/structured_meta.html || true
           if git diff --cached --quiet; then
             echo "No meta changes; skipping push."
             exit 0
           fi
-
           branch="${GITHUB_REF_NAME:-$(git rev-parse --abbrev-ref HEAD)}"
           git pull --rebase origin "$branch" || true
           git commit -m "chore(meta): update JSON-LD + OG/Twitter [skip ci]"
