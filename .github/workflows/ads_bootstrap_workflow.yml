@@ -9,7 +9,7 @@ on:
         required: true
       campaign_name:
         description: "Campaign name"
-        default: "TitanCraft - Search — Bootstrapped"
+        default: "TitanCraft – Search – Bootstrapped"
         required: true
 
 permissions:
@@ -18,6 +18,15 @@ permissions:
 jobs:
   bootstrap:
     runs-on: ubuntu-latest
+
+    # Make secrets available to ALL steps in this job
+    env:
+      GADS_DEVELOPER_TOKEN: ${{ secrets.GADS_DEVELOPER_TOKEN || secrets.GOOGLE_ADS_DEVELOPER_TOKEN }}
+      GADS_CLIENT_ID:       ${{ secrets.GADS_CLIENT_ID       || secrets.GOOGLE_ADS_CLIENT_ID }}
+      GADS_CLIENT_SECRET:   ${{ secrets.GADS_CLIENT_SECRET   || secrets.GOOGLE_ADS_CLIENT_SECRET }}
+      GADS_REFRESH_TOKEN:   ${{ secrets.GADS_REFRESH_TOKEN   || secrets.GOOGLE_ADS_REFRESH_TOKEN }}
+      GADS_LOGIN_CUSTOMER_ID: ${{ secrets.GADS_LOGIN_CUSTOMER_ID || secrets.GOOGLE_ADS_LOGIN_CUSTOMER_ID }}
+      GADS_CUSTOMER_ID:       ${{ secrets.GADS_CUSTOMER_ID       || secrets.GOOGLE_ADS_CUSTOMER_ID }}
 
     steps:
       - name: Checkout
@@ -33,139 +42,55 @@ jobs:
       - name: Install Google Ads SDK
         run: |
           python -m pip install --upgrade pip
-          pip install "google-ads==24.1.0"
+          pip install google-ads==24.1.0
 
-      # Normalize secrets so we can support either GADS_* or GOOGLE_ADS_* names.
-      - name: Normalize secrets into env
-        env:
-          DEV: ${{ secrets.GADS_DEVELOPER_TOKEN || secrets.GOOGLE_ADS_DEVELOPER_TOKEN }}
-          CID: ${{ secrets.GADS_CLIENT_ID || secrets.GOOGLE_ADS_CLIENT_ID }}
-          CSEC: ${{ secrets.GADS_CLIENT_SECRET || secrets.GOOGLE_ADS_CLIENT_SECRET }}
-          REF: ${{ secrets.GADS_REFRESH_TOKEN || secrets.GOOGLE_ADS_REFRESH_TOKEN }}
-          LGC: ${{ secrets.GADS_LOGIN_CUSTOMER_ID || secrets.GOOGLE_ADS_LOGIN_CUSTOMER_ID }}
-          CUS: ${{ secrets.GADS_CUSTOMER_ID || secrets.GOOGLE_ADS_CUSTOMER_ID }}
+      - name: Debug secrets presence (safe)
+        shell: bash
         run: |
           set -euo pipefail
-          echo "GADS_DEVELOPER_TOKEN=${DEV}" >> $GITHUB_ENV
-          echo "GADS_CLIENT_ID=${CID}" >> $GITHUB_ENV
-          echo "GADS_CLIENT_SECRET=${CSEC}" >> $GITHUB_ENV
-          echo "GADS_REFRESH_TOKEN=${REF}" >> $GITHUB_ENV
-          echo "GADS_LOGIN_CUSTOMER_ID=${LGC}" >> $GITHUB_ENV
-          echo "GADS_CUSTOMER_ID=${CUS}" >> $GITHUB_ENV
+          for k in GADS_DEVELOPER_TOKEN GADS_CLIENT_ID GADS_CLIENT_SECRET GADS_REFRESH_TOKEN GADS_LOGIN_CUSTOMER_ID GADS_CUSTOMER_ID; do
+            if [ -z "${!k:-}" ]; then
+              echo "::error::$k is MISSING"
+            else
+              echo "$k=***"
+            fi
+          done
 
-      - name: Create Search campaign
-        shell: bash
-        env:
-          DAILY_BUDGET: ${{ github.event.inputs.daily_budget }}
-          CAMPAIGN_NAME: ${{ github.event.inputs.campaign_name }}
+      - name: Create Search campaign (auth smoke test)
         run: |
           python - <<'PY'
           import os, sys, uuid
           from google.ads.googleads.client import GoogleAdsClient
           from google.ads.googleads.errors import GoogleAdsException
 
-          def usd_to_micros(d):
-            return int(round(float(d) * 1_000_000))
-
           required = [
-            "GADS_DEVELOPER_TOKEN",
-            "GADS_CLIENT_ID",
-            "GADS_CLIENT_SECRET",
-            "GADS_REFRESH_TOKEN",
-            "GADS_LOGIN_CUSTOMER_ID",
-            "GADS_CUSTOMER_ID",
+            "GADS_DEVELOPER_TOKEN","GADS_CLIENT_ID","GADS_CLIENT_SECRET",
+            "GADS_REFRESH_TOKEN","GADS_LOGIN_CUSTOMER_ID","GADS_CUSTOMER_ID"
           ]
-          missing = [k for k in required if not os.getenv(k)]
+          missing = [k for k in required if not os.environ.get(k)]
           if missing:
-            raise SystemExit(f"Missing secrets: {', '.join(missing)}")
+            print("MISSING_ENV=" + ",".join(missing))
+            sys.exit(2)
 
+          # Flat config (works with current google-ads SDK)
           config = {
-            "developer_token": os.environ["GADS_DEVELOPER_TOKEN"],
+            "developer_token":   os.environ["GADS_DEVELOPER_TOKEN"],
             "login_customer_id": os.environ["GADS_LOGIN_CUSTOMER_ID"],
+            "client_id":         os.environ["GADS_CLIENT_ID"],
+            "client_secret":     os.environ["GADS_CLIENT_SECRET"],
+            "refresh_token":     os.environ["GADS_REFRESH_TOKEN"],
             "use_proto_plus": True,
-            "oauth2": {
-              "client_id": os.environ["GADS_CLIENT_ID"],
-              "client_secret": os.environ["GADS_CLIENT_SECRET"],
-              "refresh_token": os.environ["GADS_REFRESH_TOKEN"],
-            },
           }
 
-          customer_id = os.environ["GADS_CUSTOMER_ID"].replace("-", "")
-          daily_budget_micros = usd_to_micros(os.getenv("DAILY_BUDGET", "30"))
-          campaign_name = os.getenv("CAMPAIGN_NAME") or f"TitanCraft Search {uuid.uuid4().hex[:6]}"
+          client = GoogleAdsClient.load_from_dict(config)
 
-          try:
-            client = GoogleAdsClient.load_from_dict(config)
+          # Minimal auth check first (keeps failures clear)
+          customer_id = os.environ["GADS_CUSTOMER_ID"]
+          ga_service = client.get_service("GoogleAdsService")
+          q = "SELECT customer.descriptive_name FROM customer LIMIT 1"
+          rows = ga_service.search(customer_id=customer_id, query=q)
+          name = next(iter(rows)).customer.descriptive_name
+          print(f"AUTH_OK for account: {name}")
 
-            budget_service = client.get_service("CampaignBudgetService")
-            campaign_service = client.get_service("CampaignService")
-            ad_group_service = client.get_service("AdGroupService")
-            ad_group_ad_service = client.get_service("AdGroupAdService")
-            ad_group_criterion_service = client.get_service("AdGroupCriterionService")
-
-            # Budget
-            budget_op = client.get_type("CampaignBudgetOperation")
-            budget = budget_op.create
-            budget.name = f"{campaign_name} Budget"
-            budget.delivery_method = client.enums.BudgetDeliveryMethodEnum.STANDARD
-            budget.amount_micros = daily_budget_micros
-            budget.explicitly_shared = False
-            budget_resp = budget_service.mutate_campaign_budgets(customer_id=customer_id, operations=[budget_op])
-            budget_res = budget_resp.results[0].resource_name
-
-            # Campaign
-            campaign_op = client.get_type("CampaignOperation")
-            campaign = campaign_op.create
-            campaign.name = campaign_name
-            campaign.campaign_budget = budget_res
-            campaign.advertising_channel_type = client.enums.AdvertisingChannelTypeEnum.SEARCH
-            campaign.status = client.enums.CampaignStatusEnum.PAUSED
-            campaign.manual_cpc.CopyFrom(client.get_type("ManualCpc")())
-
-            campaign_resp = campaign_service.mutate_campaigns(customer_id=customer_id, operations=[campaign_op])
-            campaign_res = campaign_resp.results[0].resource_name
-
-            # Ad group
-            ag_op = client.get_type("AdGroupOperation")
-            ad_group = ag_op.create
-            ad_group.name = f"{campaign_name} Ad Group"
-            ad_group.campaign = campaign_res
-            ad_group.type_ = client.enums.AdGroupTypeEnum.SEARCH_STANDARD
-            ad_group.status = client.enums.AdGroupStatusEnum.ENABLED
-            ad_group.cpc_bid_micros = 1_000_000  # $1.00
-            ag_resp = ad_group_service.mutate_ad_groups(customer_id=customer_id, operations=[ag_op])
-            ad_group_res = ag_resp.results[0].resource_name
-
-            # Ad
-            aga_op = client.get_type("AdGroupAdOperation")
-            ad_group_ad = aga_op.create
-            ad_group_ad.ad_group = ad_group_res
-            ad_group_ad.status = client.enums.AdGroupAdStatusEnum.PAUSED
-            eta = ad_group_ad.ad.expanded_text_ad
-            eta.headline_part1 = "Try TitanCraft AI"
-            eta.headline_part2 = "Smarter AI Workflows"
-            eta.description = "Automate growth. Bootstrap search campaigns in minutes."
-            ad_group_ad.ad.final_urls.append("https://titancraft.io/")
-            ad_group_ad_service.mutate_ad_group_ads(customer_id=customer_id, operations=[aga_op])
-
-            # Keywords
-            kws = ["ai assistant","automate workflows","marketing automation ai","ai growth platform"]
-            ops = []
-            for kw in kws:
-              op = client.get_type("AdGroupCriterionOperation")
-              c = op.create
-              c.ad_group = ad_group_res
-              c.status = client.enums.AdGroupCriterionStatusEnum.ENABLED
-              c.keyword.text = kw
-              c.keyword.match_type = client.enums.KeywordMatchTypeEnum.PHRASE
-              ops.append(op)
-            if ops:
-              ad_group_criterion_service.mutate_ad_group_criteria(customer_id=customer_id, operations=ops)
-
-            print(f"OK: created campaign {campaign_res}")
-
-          except GoogleAdsException as ex:
-            for e in ex.failure.errors:
-              print(f"Google Ads error: {e.error_code} | {e.message}")
-            raise
+          # ---- (You can add create budget/campaign code below once auth passes) ----
           PY
