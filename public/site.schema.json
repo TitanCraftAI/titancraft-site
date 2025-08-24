@@ -1,0 +1,11 @@
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "TitanCraft AI",
+  "url": "https://titancraft.io",
+  "logo": "https://titancraft.io/public/logo.png",
+  "sameAs": [
+    "https://x.com/titancraftai",
+    "https://www.linkedin.com/company/titancraft-ai"
+  ]
+}
