@@ -1,0 +1,73 @@
+name: Marketing — Autopilot SEO + Indexing
+on:
+  schedule:
+    - cron: '17 7,19 * * *'   # twice daily UTC
+  workflow_dispatch: {}
+jobs:
+  autopilot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { persist-credentials: true }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+
+      - name: Generate sitemap & robots
+        run: |
+          python - <<'PY'
+          import os, subprocess, xml.etree.ElementTree as ET, datetime
+          domain = "https://titancraft.io"
+          pages = []
+          for root, _, files in os.walk("."):
+              if ".git" in root or ".github" in root: 
+                  continue
+              for f in files:
+                  if f.endswith(".html"):
+                      path = os.path.join(root, f)[2:]
+                      url = f"{domain}/{path}".replace("/index.html","/")
+                      try:
+                          dt = subprocess.check_output(
+                            ["git","log","-1","--format=%cI", path]
+                          ).decode().strip()
+                      except Exception:
+                          dt = datetime.datetime.utcnow().isoformat()+"Z"
+                      pages.append((url, dt))
+          urlset = ET.Element("urlset", xmlns="http://www.sitemaps.org/schemas/sitemap/0.9")
+          for url, dt in sorted(set(pages)):
+              u = ET.SubElement(urlset,"url")
+              ET.SubElement(u,"loc").text = url
+              ET.SubElement(u,"lastmod").text = dt
+              ET.SubElement(u,"changefreq").text = "daily"
+              ET.SubElement(u,"priority").text = "0.7" if "founding-beta" in url else "0.5"
+          ET.ElementTree(urlset).write("sitemap.xml", encoding="utf-8", xml_declaration=True)
+
+          # robots.txt (idempotent)
+          robots = "robots.txt"
+          wanted = f"Sitemap: {domain}/sitemap.xml"
+          lines = []
+          if os.path.exists(robots):
+              lines = open(robots, "r", encoding="utf-8").read().splitlines()
+          if wanted not in lines:
+              base = ["User-agent: *", "Allow: /"]
+              for b in base:
+                  if b not in lines: lines.append(b)
+              lines.append(wanted)
+              open(robots, "w", encoding="utf-8").write("\n".join(lines) + "\n")
+          PY
+
+      - name: Commit & push SEO assets
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "titan-bot"
+            git config user.email "titan-bot@users.noreply.github.com"
+            git add sitemap.xml robots.txt
+            git commit -m "chore(seo): auto-generate sitemap & robots"
+            git push
+          else
+            echo "No changes to commit"
+          fi
+
+      - name: Ping search engines
+        run: |
+          curl -fsS "https://www.google.com/ping?sitemap=https://titancraft.io/sitemap.xml" || true
+          curl -fsS "https://www.bing.com/ping?sitemap=https://titancraft.io/sitemap.xml" || true
