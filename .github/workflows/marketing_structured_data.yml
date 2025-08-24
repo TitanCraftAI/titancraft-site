@@ -1,0 +1,106 @@
+name: Marketing — Structured Data (JSON-LD)
+
+on:
+  schedule:
+    - cron: "22 6 * * *"     # once daily UTC
+  workflow_dispatch: {}       # run by hand from Actions tab
+
+jobs:
+  structured_data:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { persist-credentials: true }
+
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+
+      - name: Inject JSON-LD into site HTML
+        run: |
+          python - <<'PY'
+          import os, re, json
+
+          DOMAIN        = "https://titancraft.io"
+          PRODUCT_URL   = f"{DOMAIN}/founding-beta/"
+          CHECKOUT_URL  = "https://buy.stripe.com/8x2fZh0Vy0wd8vp1DyaAw0c"
+          BRAND_NAME    = "TitanCraft"
+          LEGAL_NAME    = "TitanCraft AI, LLC"
+          PRICE         = "29.00"
+          CURRENCY      = "USD"
+
+          # --- JSON-LD payloads ---
+          org = {
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            "name": LEGAL_NAME,
+            "url": DOMAIN
+          }
+
+          software = {
+            "@context": "https://schema.org",
+            "@type": "SoftwareApplication",
+            "name": BRAND_NAME,
+            "applicationCategory": "BusinessApplication",
+            "operatingSystem": "Web",
+            "url": PRODUCT_URL,
+            "offers": {
+              "@type": "Offer",
+              "price": PRICE,
+              "priceCurrency": CURRENCY,
+              "availability": "https://schema.org/InStock",
+              "url": CHECKOUT_URL
+            },
+            "publisher": {
+              "@type": "Organization",
+              "name": LEGAL_NAME,
+              "url": DOMAIN
+            }
+          }
+
+          bundle = [org, software]
+          json_ld = '<script type="application/ld+json">' + json.dumps(bundle, ensure_ascii=False) + '</script>'
+
+          START = "<!-- JSON-LD START -->"
+          END   = "<!-- JSON-LD END -->"
+          BLOCK = f"{START}\n{json_ld}\n{END}\n"
+
+          def patch(path: str) -> bool:
+            if not os.path.exists(path):
+              return False
+            html = open(path, "r", encoding="utf-8").read()
+            if START in html and END in html:
+              new = re.sub(r"<!-- JSON-LD START -->.*?<!-- JSON-LD END -->", BLOCK, html, flags=re.S|re.I)
+              changed = (new != html)
+              html = new
+            else:
+              lowered = html.lower()
+              inserted = False
+              for tag in ("</head>", "</body>"):
+                i = lowered.find(tag)
+                if i != -1:
+                  html = html[:i] + BLOCK + html[i:]
+                  inserted = True
+                  break
+              changed = inserted
+            if changed:
+              open(path, "w", encoding="utf-8").write(html)
+            return changed
+
+          changed = False
+          for p in ("index.html", "founding-beta/index.html"):
+            changed = patch(p) or changed
+
+          print("changed:", changed)
+          PY
+
+      - name: Commit & push (if changed)
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name  "titan-bot"
+            git config user.email "titan-bot@users.noreply.github.com"
+            git add -A
+            git commit -m "feat(seo): inject/update JSON-LD (Organization + SoftwareApplication)"
+            git push
+          else
+            echo "No structured-data changes"
+          fi
