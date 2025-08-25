@@ -2,17 +2,14 @@ name: Add LinkedIn Insight Tag
 
 on:
   push:
-    branches: [ main ]
-    # re-run when HTML changes or when this workflow changes
-    paths:
-      - '**/*.html'
-      - '.github/workflows/add_linkedin_tag.yml'
+    branches:
+      - main
 
 permissions:
   contents: write
 
 jobs:
-  patch:
+  inject:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -20,15 +17,18 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Inject LI Insight Tag into HTML (id: 7754636)
+      - name: Add Insight Tag to HTML
+        shell: bash
         run: |
-          python3 - <<'PY'
-          import re, glob, os
-          SNIPPET = """<script type="text/javascript">
+          set -euo pipefail
+          snippet_file=".github/li_snippet.html"
+          cat > "$snippet_file" <<'SNIP'
+          <script type="text/javascript">
           _linkedin_partner_id = "7754636";
           window._linkedin_data_partner_ids = window._linkedin_data_partner_ids || [];
           window._linkedin_data_partner_ids.push(_linkedin_partner_id);
-          </script><script type="text/javascript">
+          </script>
+          <script type="text/javascript">
           (function(l) {
           if (!l){window.lintrk = function(a,b){window.lintrk.q.push([a,b])};
           window.lintrk.q=[]}
@@ -41,26 +41,29 @@ jobs:
           <noscript>
           <img height="1" width="1" style="display:none;" alt="" src="https://px.ads.linkedin.com/collect/?pid=7754636&fmt=gif" />
           </noscript>
-          """
-          needle = re.compile(r'snap\.licdn\.com/li\.lms-analytics/insight\.min\.js')
-          changed = False
-          for path in glob.glob("**/*.html", recursive=True):
-              with open(path, "r", encoding="utf-8", errors="ignore") as f:
-                  html = f.read()
-              if needle.search(html):
-                  continue
-              m = re.search(r'</head\s*>', html, re.I)
-              if m:
-                  html = html[:m.start()] + SNIPPET + "\n" + html[m.start():]
-              else:
-                  html += "\n" + SNIPPET + "\n"
-              with open(path, "w", encoding="utf-8") as f:
-                  f.write(html)
-              print(f"Inserted LI tag into {path}")
-              changed = True
-          if not changed:
-              print("No files needed changes.")
-          PY
+          SNIP
+
+          changed=0
+          while IFS= read -r -d '' f; do
+            # Already has LI script?
+            if grep -q 'snap\.licdn\.com/li\.lms-analytics/insight\.min\.js' "$f"; then
+              continue
+            fi
+            if grep -qi '</head>' "$f"; then
+              # Insert before </head>
+              awk -v RS= -v ORS= -v snip="$(cat "$snippet_file")" \
+                '{sub(/<\/head>/, snip "\n</head>"); print}' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+            else
+              # No </head>: append to end
+              printf '\n%s\n' "$(cat "$snippet_file")" >> "$f"
+            fi
+            echo "Patched: $f"
+            changed=1
+          done < <(find . -type f -name "*.html" -print0)
+
+          if [ $changed -eq 0 ]; then
+            echo "No files needed changes."
+          fi
 
       - name: Commit & push if changed
         run: |
