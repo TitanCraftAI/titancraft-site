@@ -1,0 +1,10 @@
+# .github/workflows/add_linkedin_tag.yml
+name: Add LinkedIn Insight Tag
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/add_linkedin_tag.yml'
+      - '**/*.html'
+permissions: { contents: write }
+# …(same steps as before that patch *.html and commit)…
